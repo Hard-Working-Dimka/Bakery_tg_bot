@@ -1,10 +1,12 @@
+from io import BytesIO
+
 from aiogram import types, Router, F, Bot
 from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
-from aiogram.types import KeyboardButton, ReplyKeyboardRemove, InputFile, InputMediaDocument
+from aiogram.types import KeyboardButton, ReplyKeyboardRemove, InputFile, FSInputFile
 
 from Common.requests_db import request_db_is_ready_cakes
 from Keyboards import reply
@@ -18,11 +20,13 @@ async def start_cmd(message: types.Message):
     await message.answer(f'Приветствую {message.from_user.first_name}! \n '
                          f'Чтобы начать, подтвердите пользовательское соглашение.',
                          reply_markup=reply.keyboard_user_accepted)
+    input_file = FSInputFile('Handlers/Agreement.pdf')
+    await message.answer_document(document=input_file)
 
 
 @user_private_router.message(F.text.contains('Отклонить'))
 async def user_accepted(message: types.Message):
-    await message.answer('Пока-пока ✌')
+    await message.answer('Пока-пока ✌', reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
 
 
 @user_private_router.message(F.text.contains('Подтвердить'))
