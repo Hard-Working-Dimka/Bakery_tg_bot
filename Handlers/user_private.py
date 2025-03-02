@@ -1,14 +1,14 @@
-from aiogram import types, Router, F
+from aiogram import types, Router, F, Bot
 from aiogram.filters import CommandStart, Command, StateFilter
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
-from aiogram.types import KeyboardButton, ReplyKeyboardRemove
+from aiogram.types import KeyboardButton, ReplyKeyboardRemove, InputFile, InputMediaDocument
 
 from Common.requests_db import request_db_is_ready_cakes
 from Keyboards import reply
-from Keyboards.reply import create_keyboard, levels, shapes, toppings, berries, decor
+from Keyboards.reply import (create_keyboard, get_levels_cake, get_shapes_cake, get_decor_cake)
 
 user_private_router = Router()
 
@@ -16,7 +16,18 @@ user_private_router = Router()
 @user_private_router.message(CommandStart())
 async def start_cmd(message: types.Message):
     await message.answer(f'Приветствую {message.from_user.first_name}! \n '
-                         f'Я бот cakeStoоre, помогу Вам заказать вкусный тортик. 🎂🎂🎂',
+                         f'Чтобы начать, подтвердите пользовательское соглашение.',
+                         reply_markup=reply.keyboard_user_accepted)
+
+
+@user_private_router.message(F.text.contains('Отклонить'))
+async def user_accepted(message: types.Message):
+    await message.answer('Пока-пока ✌')
+
+
+@user_private_router.message(F.text.contains('Подтвердить'))
+async def user_accepted(message: types.Message):
+    await message.answer('Я бот cakeStoоre, помогу Вам заказать вкусный тортик. 🎂🎂🎂',
                          reply_markup=reply.keyboard)
 
 
@@ -38,7 +49,7 @@ async def payment(message: types.Message):
     await message.answer('''Какой-то способ''')
 
 
-# FSM
+# FSM for cake
 class GetCakes(StatesGroup):
     name = State()
     number = State()
@@ -49,7 +60,7 @@ class GetCakes(StatesGroup):
 
 @user_private_router.message(Command('cakeslist'))
 @user_private_router.message(StateFilter(None), F.text.contains('Заказать тортик'))
-async def choose_cake(message: types.Message, state: FSMContext):
+async def choose_cake(message: types.Message, state: FSMContext, bot: Bot):
     ready_cakes = request_db_is_ready_cakes()
     keyboard_for_choose_cake = ReplyKeyboardBuilder()
     for cake in ready_cakes:
@@ -111,8 +122,6 @@ class GetCustomCakes(StatesGroup):
     number = State()
     levels = State()
     form = State()
-    topping = State()
-    berry = State()
     decor = State()
     title = State()
     date_delivery = State()
@@ -125,35 +134,21 @@ async def custom_cake(message: types.Message, state: FSMContext):
     for cake in ready_cakes:
         if cake['name'] == 'Кастомный':
             await message.answer(
-                text='Выберите количество уровней', reply_markup=create_keyboard(levels))
+                text='Выберите количество уровней', reply_markup=create_keyboard(get_levels_cake()))
     await state.set_state(GetCustomCakes.levels)
 
 
 @user_private_router.message(GetCustomCakes.levels, F.text)
 async def choose_levels(message: types.Message, state: FSMContext):
     await state.update_data(levels=message.text)
-    await message.answer('Выберите форму', reply_markup=create_keyboard(shapes))
+    await message.answer('Выберите форму', reply_markup=create_keyboard(get_shapes_cake()))
     await state.set_state(GetCustomCakes.form)
 
 
 @user_private_router.message(GetCustomCakes.form, F.text)
-async def choose_topping(message: types.Message, state: FSMContext):
-    await state.update_data(form=message.text)
-    await message.answer('Выберите топпинг', reply_markup=create_keyboard(toppings))
-    await state.set_state(GetCustomCakes.topping)
-
-
-@user_private_router.message(GetCustomCakes.topping, F.text)
-async def choose_berries(message: types.Message, state: FSMContext):
-    await state.update_data(topping=message.text)
-    await message.answer('Выберите ягоды', reply_markup=create_keyboard(berries))
-    await state.set_state(GetCustomCakes.berry)
-
-
-@user_private_router.message(GetCustomCakes.berry, F.text)
 async def choose_decor(message: types.Message, state: FSMContext):
-    await state.update_data(berry=message.text)
-    await message.answer('Выберите декор', reply_markup=create_keyboard(decor))
+    await state.update_data(form=message.text)
+    await message.answer('Выберите декор', reply_markup=create_keyboard(get_decor_cake()))
     await state.set_state(GetCustomCakes.decor)
 
 
