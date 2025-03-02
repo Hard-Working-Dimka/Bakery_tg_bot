@@ -6,5 +6,5 @@ private = [
     BotCommand(command='cakeslist', description='Список тортов'),
     BotCommand(command='feedback', description='Обратная связь'),
     BotCommand(command='payment', description='Способы оплаты'),
-    BotCommand(command='customize', description='Соберите свой торт')
+    BotCommand(command='customcake', description='Соберите свой торт')
 ]

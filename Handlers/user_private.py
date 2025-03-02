@@ -4,13 +4,14 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
-from aiogram.types import KeyboardButton, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import KeyboardButton, ReplyKeyboardRemove
 
 from Common.requests_db import request_db_is_ready_cakes
-from Keyboards import reply,inline
-from Keyboards.inline import create_keyboard, user_choices, callback_handler
+from Keyboards import reply
+from Keyboards.reply import create_keyboard, levels, shapes, toppings, berries, decor
 
 user_private_router = Router()
+
 
 @user_private_router.message(CommandStart())
 async def start_cmd(message: types.Message):
@@ -23,12 +24,12 @@ async def start_cmd(message: types.Message):
 @user_private_router.message(F.text.contains('Обратная связь'))
 async def cmd_cake_list(message: types.Message):
     await message.answer(
-                    '''Для отзывов по работе сервиса и получению информации о времени доставки можно обратиться:
-                        <b>Телефон</b> : +7123456789
-                        <b>TG</b> : @dunyakhin 
-                        <b>Email</b> : support@gmail.com''',
-                        parse_mode=ParseMode.HTML
-                        )
+        '''Для отзывов по работе сервиса и получению информации о времени доставки можно обратиться:
+            <b>Телефон</b> : +7123456789
+            <b>TG</b> : @dunyakhin 
+            <b>Email</b> : support@gmail.com''',
+        parse_mode=ParseMode.HTML
+    )
 
 
 @user_private_router.message(Command('payment'))
@@ -37,34 +38,35 @@ async def payment(message: types.Message):
     await message.answer('''Какой-то способ''')
 
 
-#FSM
+# FSM
 class GetCakes(StatesGroup):
     name = State()
     number = State()
     address = State()
     cake = State()
-    customization = State()
+    date_delivery = State()
 
 
 @user_private_router.message(Command('cakeslist'))
-@user_private_router.message(StateFilter(None),F.text.contains('Заказать тортик'))
-async def choose_cake(message: types.Message, state:FSMContext):
+@user_private_router.message(StateFilter(None), F.text.contains('Заказать тортик'))
+async def choose_cake(message: types.Message, state: FSMContext):
     ready_cakes = request_db_is_ready_cakes()
     keyboard_for_choose_cake = ReplyKeyboardBuilder()
     for cake in ready_cakes:
-        keyboard_for_choose_cake.add(KeyboardButton(text=f"Выбрать {cake['name']}"))
-        keyboard_for_choose_cake.adjust(1)
-        await message.answer(
-            text=f'''<b>Название</b>: {cake['name']}.
-                \n<b>Описание</b>: {cake['description']}.
-                \n<b>Состав</b>: {cake['ingredients']}.
-                \n<b>Цена</b>: {cake['price']}.
-                \n<b>Фото</b>: {cake['photo']}''',parse_mode=ParseMode.HTML,
-             reply_markup=keyboard_for_choose_cake.as_markup(resize_keyboard=True))
+        if not cake['name'] == 'Кастомный':
+            keyboard_for_choose_cake.add(KeyboardButton(text=f"Выбрать {cake['name']}"))
+            keyboard_for_choose_cake.adjust(1)
+            await message.answer(
+                text=f'''<b>Название</b>: {cake['name']}.
+                    \n<b>Описание</b>: {cake['description']}.
+                    \n<b>Состав</b>: {cake['ingredients']}.
+                    \n<b>Цена</b>: {cake['price']}.
+                    \n<b>Фото</b>: {cake['photo']}''', parse_mode=ParseMode.HTML,
+                reply_markup=keyboard_for_choose_cake.as_markup(resize_keyboard=True))
     await state.set_state(GetCakes.cake)
 
 
-@user_private_router.message(GetCakes.cake,F.text)
+@user_private_router.message(GetCakes.cake, F.text)
 async def get_user_info_cake(message: types.Message, state: FSMContext):
     await state.update_data(cake=message.text)
     await message.answer('Вы выбрали торт', reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
@@ -72,32 +74,122 @@ async def get_user_info_cake(message: types.Message, state: FSMContext):
     await state.set_state(GetCakes.number)
 
 
-@user_private_router.message(GetCakes.number,F.text)
+@user_private_router.message(GetCakes.number, F.text)
 async def get_user_info_number(message: types.Message, state: FSMContext):
     await state.update_data(number=message.text)
     await message.answer('Введите адрес')
     await state.set_state(GetCakes.address)
 
 
-@user_private_router.message(GetCakes.address,F.text)
+@user_private_router.message(GetCakes.address, F.text)
 async def get_user_info_address(message: types.Message, state: FSMContext):
     await state.update_data(address=message.text)
     await message.answer('Введите имя')
     await state.set_state(GetCakes.name)
 
 
-@user_private_router.message(GetCakes.name,F.text)
-async def get_user_info_customization(message: types.Message, state: FSMContext):
+@user_private_router.message(GetCakes.name, F.text)
+async def get_user_info_address(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
+    await message.answer('Введите дату доставки(+20% если в течении 24 часов):')
+    await state.set_state(GetCustomCakes.date_delivery)
+
+
+@user_private_router.message(GetCakes.date_delivery, F.text)
+async def got_offer(message: types.Message, state: FSMContext):
+    await state.update_data(date_delivery=message.text)
     await message.answer('Заказ принят🤙', reply_markup=reply.keyboard)
     data = await state.get_data()
     await message.answer(str(data))
     await state.clear()
 
 
-@user_private_router.message(Command('customize'))
-@user_private_router.message(F.text.contains('Кастомизировать'))
-async def get_user_info_customization(message: types.Message, state: FSMContext):
-    await message.answer('Кастомизируйте', reply_markup=create_keyboard("Количество уровней").as_markup())
-    await state.update_data(customization=user_choices)
+# FSM for custom cakes
+class GetCustomCakes(StatesGroup):
+    name = State()
+    address = State()
+    number = State()
+    levels = State()
+    form = State()
+    topping = State()
+    berry = State()
+    decor = State()
+    title = State()
+    date_delivery = State()
+
+
+@user_private_router.message(Command('customcake'))
+@user_private_router.message(StateFilter(None), F.text.contains('Собрать свой тортик'))
+async def custom_cake(message: types.Message, state: FSMContext):
+    ready_cakes = request_db_is_ready_cakes()
+    for cake in ready_cakes:
+        if cake['name'] == 'Кастомный':
+            await message.answer(
+                text='Выберите количество уровней', reply_markup=create_keyboard(levels))
+    await state.set_state(GetCustomCakes.levels)
+
+
+@user_private_router.message(GetCustomCakes.levels, F.text)
+async def choose_levels(message: types.Message, state: FSMContext):
+    await state.update_data(levels=message.text)
+    await message.answer('Выберите форму', reply_markup=create_keyboard(shapes))
+    await state.set_state(GetCustomCakes.form)
+
+
+@user_private_router.message(GetCustomCakes.form, F.text)
+async def choose_topping(message: types.Message, state: FSMContext):
+    await state.update_data(form=message.text)
+    await message.answer('Выберите топпинг', reply_markup=create_keyboard(toppings))
+    await state.set_state(GetCustomCakes.topping)
+
+
+@user_private_router.message(GetCustomCakes.topping, F.text)
+async def choose_berries(message: types.Message, state: FSMContext):
+    await state.update_data(topping=message.text)
+    await message.answer('Выберите ягоды', reply_markup=create_keyboard(berries))
+    await state.set_state(GetCustomCakes.berry)
+
+
+@user_private_router.message(GetCustomCakes.berry, F.text)
+async def choose_decor(message: types.Message, state: FSMContext):
+    await state.update_data(berry=message.text)
+    await message.answer('Выберите декор', reply_markup=create_keyboard(decor))
+    await state.set_state(GetCustomCakes.decor)
+
+
+@user_private_router.message(GetCustomCakes.decor, F.text)
+async def get_user_name_for_custom_cake(message: types.Message, state: FSMContext):
+    await state.update_data(decor=message.text)
+    await message.answer('Вы собрали свой кастомный торт.\nВведите свое имя:',
+                         reply_markup=ReplyKeyboardRemove(remove_keyboard=True))
+    await state.set_state(GetCustomCakes.name)
+
+
+@user_private_router.message(GetCustomCakes.name, F.text)
+async def get_user_address_for_custom_cake(message: types.Message, state: FSMContext):
+    await state.update_data(name=message.text)
+    await message.answer('Введите адрес доставки:')
+    await state.set_state(GetCustomCakes.address)
+
+
+@user_private_router.message(GetCustomCakes.address, F.text)
+async def get_user_number_for_custom_cake(message: types.Message, state: FSMContext):
+    await state.update_data(address=message.text)
+    await message.answer('Введите Ваш номер телефона:')
+    await state.set_state(GetCustomCakes.number)
+
+
+@user_private_router.message(GetCustomCakes.number, F.text)
+async def get_user_info_address(message: types.Message, state: FSMContext):
+    await state.update_data(number=message.text)
+    await message.answer('Введите дату доставки(+20% если в течении 24 часов):')
+    await state.set_state(GetCustomCakes.date_delivery)
+
+
+@user_private_router.message(GetCustomCakes.date_delivery, F.text)
+async def get_user_info_address(message: types.Message, state: FSMContext):
+    await state.update_data(date_delivery=message.text)
+    await message.answer('Заказ принят🤙', reply_markup=reply.keyboard)
+    data = await state.get_data()
+    await message.answer(str(data))
     await state.clear()
