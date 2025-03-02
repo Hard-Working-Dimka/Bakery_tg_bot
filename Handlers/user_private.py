@@ -12,8 +12,8 @@ from Common.requests_db import request_db_is_ready_cakes
 from Keyboards import reply
 from Keyboards.reply import (create_keyboard, get_levels_cake, get_shapes_cake, get_decor_cake)
 
-user_private_router = Router()
 
+user_private_router = Router()
 
 @user_private_router.message(CommandStart())
 async def start_cmd(message: types.Message):
